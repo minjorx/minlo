@@ -8,6 +8,27 @@ Minlo 通过 **能力（Capability）** 与 **任务（Mission）** 两个核心
 - 任务 = 一个 JSON 文件,按 `name` 引用若干能力,可选传入 `config`
 - 框架在两次 `minlo run` 之间重新发现能力;主循环期间能力集锁定
 
+## 设计理念
+
+| 理念 | 含义 |
+|---|---|
+| **能力驱动** | 一切功能单元都是"能力"——每个能力导出 `init` / `execute` / `destroy` 三个固定函数,框架据此调用。**不**预设 tool / hook / retriever 等角色——能力做什么由它自己决定 |
+| **严格 schema** | 能力文件只允许 7 个字段(`name` / `description` / `init` / `execute` / `destroy` / `deps` / `externalDeps`)。多一个就拒——把"约定俗成"挡在框架外 |
+| **声明式编排** | 任务 = 一份 JSON 清单,按 `name` 引用若干能力。**不**改框架源码就能组合出不同的 agent |
+| **代码与配置分离** | 逻辑(JS)放 `abilities/`,编排(JSON)放 `missions/`,运行时数据放 `workspace/`。三个目录,三种归属,三种版本控制策略 |
+| **热插拔** | 改能力文件无需重启 daemon——下次 `minlo run` 自动重发现。主循环一旦开始,能力集就**锁定**,运行中不变(避免"半新半旧"的不一致) |
+| **显式优于隐式** | 任务通过 `name` 显式引用能力;不通过 `type` / `order` 等隐式字段决定行为。能力间依赖单向声明(`deps`),不靠"魔法"注入 |
+| **空循环默认** | 无配置时框架只做 I/O,不预设任何"主对话 / 主 agent"行为。业务流程由你写的第一个能力定义 |
+
+**这意味着什么**——和常见框架的对比:
+
+- 不同于 LangChain:你**不**继承 `BaseTool`、**不**写 `Runnable` 链——只 export 三个函数
+- 不同于 `type: "tool" | "agent"` 的隐式分类:能力**没有**"角色",只看 `init` / `execute` / `destroy` 在不在
+- 不同于 `loop.maxIterations` 兜底:v1 主循环是死循环,**由能力自己决定何时返回 `{ action: 'stop' }`**
+- 不同于继承式 agent 框架:任务**不能** extends 别的任务,每个完全自包含——避免隐式依赖和配置漂移
+
+完整设计动机与边界见 [docs/design.md §1](docs/design.md#1-项目概述) 和 [§9](docs/design.md#9-设计约束与边界)。
+
 ## 快速开始
 
 ### 安装
