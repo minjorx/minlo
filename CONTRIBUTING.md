@@ -63,7 +63,7 @@ npm run install:global         # 手动跑 postinstall(把 global-assets/abiliti
 
 ### 关键约定(改前必读)
 
-1. **能力文件 schema 严格**(`docs/design.md §3.1`)。7 个允许字段:`name` / `description` / `init` / `execute` / `destroy` / `deps` / `externalDeps`。**多一个就拒**。
+1. **能力文件 schema 严格**(`docs/design.md §3.1`)。8 个允许字段:`name` / `description` / `init` / `execute` / `destroy` / `deps` / `externalDeps` / `provide`。**多一个就拒**。
 2. **`execute` 返回值协议**(`docs/design.md §4.2`)。`{ action: 'continue' | 'break' | 'stop' }`,没有 `action` 字段等价 `continue`;异常 = 退出。
 3. **跨能力通信走 `process.minlo.ctx`**(`docs/design.md §3.8`)。**不要**用 `globalThis.ctx` 或 `globalThis.minlo`。
 4. **能力 init 用 `deps` 声明拓扑序**(`docs/design.md §3.7`)。**不**传递数据。

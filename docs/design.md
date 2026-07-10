@@ -548,7 +548,7 @@ minlo run chat
 ```
 
 **关键设计点**（与 §3.1 §3.7 §3.8 §3.9 §3.10 的对应关系）：
-- 7 字段：name / description / externalDeps + **init** / **execute** / **destroy** 全有
+- 实际导出 7 个字段（schema 允许 8 个,本能力不用 `provide`）：`name` / `description` / `externalDeps` + **init** / **execute** / **destroy** 全有
 - 0 deps（不依赖其他能力）
 - 状态通过 `process.minlo.ctx.llm` 暴露
 - config 注入 `process.minlo.configs.llm`

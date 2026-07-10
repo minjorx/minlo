@@ -13,7 +13,7 @@ Minlo 通过 **能力（Ability）** 与 **任务（Mission）** 两个核心概
 | 理念 | 含义 |
 |---|---|
 | **能力驱动** | 一切功能单元都是"能力"——每个能力导出 `init` / `execute` / `destroy` 三个固定函数,框架据此调用。**不**预设 tool / hook / retriever 等角色——能力做什么由它自己决定 |
-| **严格 schema** | 能力文件只允许 7 个字段(`name` / `description` / `init` / `execute` / `destroy` / `deps` / `externalDeps`)。多一个就拒——把"约定俗成"挡在框架外 |
+| **严格 schema** | 能力文件只允许 8 个字段(`name` / `description` / `init` / `execute` / `destroy` / `deps` / `externalDeps` / `provide`)。多一个就拒——把"约定俗成"挡在框架外 |
 | **声明式编排** | 任务 = 一份 JSON 清单,按 `name` 引用若干能力。**不**改框架源码就能组合出不同的 agent |
 | **代码与配置分离** | 逻辑(JS)放 `abilities/`,编排(JSON)放 `missions/`,运行时数据放 `workspace/`。三个目录,三种归属,三种版本控制策略 |
 | **热插拔** | 改能力文件无需重启 daemon——下次 `minlo run` 自动重发现。主循环一旦开始,能力集就**锁定**,运行中不变(避免"半新半旧"的不一致) |
@@ -197,10 +197,10 @@ minlo run
 ├── bin/minlo.ts                # CLI 入口(shebang 保留)
 ├── src/                        # 框架核心
 │   ├── lib/                    # loader, mission 解析, topo 排序, runtime
-│   └── commands/               # init / list / run / version
+│   └── commands/               # init / list / run / version / docs
 ├── templates/missions/        # `minlo init` 复制的 default.json
-├── global-assets/abilities/    # helloworld + llm 装到 ~/.minlo/
-├── scripts/                    # 构建 & postinstall
+├── global-assets/abilities/    # helloworld + llm + counter + demo-user 装到 ~/.minlo/
+├── scripts/                    # 构建 + postinstall + asset copy
 ├── docs/                       # 设计文档 & 示例
 └── package.json
 ```

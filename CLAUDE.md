@@ -31,7 +31,7 @@
 
 ```bash
 # 改源码后
-npm run build                          # tsc + copy templates
+npm run build                          # tsc + copy-assets (templates/, docs/)
 npm run dev -- list                    # 不构建,tsx 直接跑
 
 # 全局 link
