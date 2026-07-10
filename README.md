@@ -119,6 +119,128 @@ export async function execute() {
 - `provide` 字段值必须全是 function(否则整个 ability 被 loader 拒)
 - 完整设计动机 / 工作原理 / 已知限制见 [`docs/design.md §3.12`](docs/design.md#312-跨能力-api-调用provide-字段--processminlocall)
 
+## `execute` 的返回值协议
+
+> 完整规范见 [docs/design.md §4.2](docs/design.md#42-阶段二主循环v1-死循环无-maxiterations)。这里给出 ability 作者**必读**的总结。
+
+每轮主循环会按 `mission.abilities` 顺序,对你能力的 `execute` 调用一次。你的 `execute` **必须**返回下列之一:
+
+| 返回值 | 框架后续行为 |
+|---|---|
+| `undefined` / `null` / `{}` / 任何不含 `action` 的对象 | 等价 `continue`——继续调本轮下一个能力 |
+| `{ action: 'continue' }` | 同上(显式) |
+| `{ action: 'break' }` | 本轮后续能力**跳过**;下一轮从你开始重跑 |
+| `{ action: 'stop' }` | **整个主循环退出**;进入 destroy 阶段 |
+| 抛异常 | **整个主循环退出**;stderr 打印错误;exit 1 |
+
+**`break` vs `stop` 的区别**:
+- `break` = "我处理完了,这一轮其他能力不用重复劳动",下一轮**还会**调你
+- `stop` = "对话结束 / 任务完成",永久退出
+
+**简单例子**:
+
+```javascript
+// .minlo/abilities/echo.js
+export const name = 'echo';
+export const description = '回显用户输入(3 轮后退出)';
+
+let round = 0;
+export async function execute() {
+  round += 1;
+  console.log(`round ${round}`);
+  if (round >= 3) return { action: 'stop' };
+  return { action: 'continue' };   // 等价于不返回
+}
+```
+
+## 能力间依赖:用 `deps` 声明拓扑序
+
+> 完整规范见 [docs/design.md §3.7](docs/design.md#37-能力间依赖deps)。
+
+当能力 A 在 `init` 里**需要**能力 B 已经完成 `init`,在 A 的 `deps` 里写 `['B']` —— 框架会保证 B 先 `init`:
+
+```javascript
+// .minlo/abilities/logger.js
+export const name = 'logger';
+export const description = '提供 log API';
+let prefix = '[main]';
+export const provide = {
+  log: (m) => process.stderr.write(`${prefix} ${m}\n`),
+};
+export async function init() {
+  const cfg = process.minlo.configs.logger;
+  if (cfg?.prefix) prefix = cfg.prefix;   // ← init 阶段读 config
+}
+```
+
+```javascript
+// .minlo/abilities/worker.js
+export const name = 'worker';
+export const deps = ['logger'];          // ← 框架保证 logger.init 先跑完
+export const description = '用 logger 打印';
+
+export async function execute() {
+  process.minlo.call('logger.log', 'working...');
+  return { action: 'continue' };
+}
+```
+
+**常见错误**:
+- 忘了写 `deps` 但 execute 里用别的 ability → **运行时**才崩(不会启动期报错)。调试时 Ctrl-C 重启看 init 顺序
+- 写循环依赖(A deps B,B deps A)→ 启动期 `cyclic dependency` 错误并 exit 1
+
+## 状态怎么存
+
+minlo 给了你 3 个等级的存储——按"活多久 / 谁能看到"挑:
+
+| 方式 | 生命周期 | 谁能看到 | 典型场景 |
+|---|---|---|---|
+| 闭包变量 | 该 ability 进程内(每次 `minlo run` 结束就没了) | 只有该 ability 自己 | 计数器、临时缓存 |
+| `process.minlo.ctx.<name>` | 同闭包变量 | 该 ability 自己 + **任何能 import 的 ability** | 跨能力共享状态 |
+| `.minlo/workspace/<name>/` 落盘 | **跨 `minlo run` 持久** | 任何 ability | 历史日志、用户偏好、向量索引 |
+
+**闭包变量**最简单——能力顶层的 `let count = 0`。
+
+**`process.minlo.ctx`** —— 跨 ability 共享状态。在 `init` 里写,其他 ability 在 `execute` 里读:
+
+```javascript
+// counter.js
+export const name = 'counter';
+export const description = '计数器';
+let n = 0;
+export const provide = { increment() { n += 1; return n; } };
+export async function init() {
+  process.minlo.ctx.counter = { get: () => n };   // 显式挂到 ctx
+}
+export async function execute() {
+  process.minlo.call('counter.increment');
+}
+```
+
+> v1.1 推荐用 `provide` + `process.minlo.call`,**不**直接在 `ctx` 里手挂对象。详见上面"能力间互相调用"。
+
+**workspace 持久化** —— 跨 `minlo run` 保留状态(写文件即可):
+
+```javascript
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+export const name = 'history';
+export const description = '历史消息持久化';
+
+export async function init({ workspacePath }) {
+  // workspacePath 是 .minlo/workspace/history/,主循环 init 前已经确保存在
+  if (!existsSync(workspacePath)) mkdirSync(workspacePath, { recursive: true });
+}
+
+export async function execute() {
+  const file = join(process.minlo.ctx.workspacePath, 'history.json');
+  // ...读写
+}
+```
+
+详细示例见 [docs/examples/multi-mission.md](docs/examples/multi-mission.md)(`counter` 改造版)。
+
 ## 给能力传配置
 
 任务 JSON 里把字符串换成 `{ "name": ..., "config": ... }`:
@@ -205,20 +327,9 @@ minlo run
 └── package.json
 ```
 
-## 文档导航
-
-| 文档 | 受众 | 内容 |
-|---|---|---|
-| [README.md](README.md) | 使用者 | 介绍、安装、快速开始、CLI、第一个能力、`provide` / `call` |
-| [docs/design.md](docs/design.md) | 高级用户 / 能力作者 | 完整设计文档(能力 schema、生命周期、配置、依赖、CLI、`provide` / `call` v1.1) |
-| [docs/examples/weather.md](docs/examples/weather.md) | 使用者 | 端到端:开发 + 调试一个能力 |
-| [docs/examples/multi-mission.md](docs/examples/multi-mission.md) | 使用者 | 多 mission + 跨 run 持久化 |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | 贡献者 | 仓库结构、开发命令、修改规范、测试 |
-| [CLAUDE.md](CLAUDE.md) | Claude(AI 助手) | 仓库速记,只放骨架和导航 |
-
 ## 反馈 / 问题
 
-直接在仓库开 issue。框架的「已知 UX 权衡」在 [docs/design.md §9](docs/design.md#9-设计约束与边界) 有说明。
+直接在仓库开 issue。框架的「已知 UX 权衡」在 [docs/design.md §9](docs/design.md#9-设计约束与边界) 有说明。LLM agent 想读完整规范见 [docs/design.md](docs/design.md)(或跑 `minlo docs`)。
 
 ## License
 
