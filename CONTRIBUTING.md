@@ -24,7 +24,6 @@
 │   │   ├── mission.ts          # 解析 <name[:fb]>、加载 .minlo/missions/<name>.json
 │   │   ├── topo.ts             # 按 deps 做拓扑排序
 │   │   ├── runtime.ts          # tsx 检测
-│   │   ├── minlo-loader-hook.ts  # process:minlo 虚拟模块的 ESM loader hook
 │   │   └── capability-registry.d.ts   # 共享类型(待补)
 │   └── commands/               # commander 子命令
 │       ├── init.ts             # `minlo init [--here]`
@@ -35,8 +34,8 @@
 │   └── abilities/default.json  # `minlo init` 复制的模板
 ├── global-assets/abilities/    # `npm install -g minlo` 的 postinstall 源
 │   ├── helloworld.js           # 默认全局能力
-│   ├── counter.js              # process:minlo 示范: provide 计数器
-│   ├── demo-user.js            # process:minlo 示范: use('counter')
+│   ├── counter.js              # provide 字段示范: 计数器
+│   ├── demo-user.js            # provide 字段示范: process.minlo.call('counter.increment')
 │   └── llm.js                  # OpenAI 兼容 LLM 能力
 ├── scripts/
 │   ├── copy-templates.mjs      # tsc 后把 templates/ 复制到 dist/templates/
@@ -109,7 +108,7 @@ npm publish         # postinstall 钩子会自动跑
 | 能力加载逻辑 | `src/lib/loader.ts` + `docs/design.md §5` |
 | Mission 解析 | `src/lib/mission.ts` + `docs/design.md §6.1.2` |
 | 主循环 | `src/commands/run.ts` + `docs/design.md §4` |
-| `process:minlo` 虚拟模块 | `src/lib/minlo-loader-hook.ts` + `bin/minlo.ts` (register 位置) + `docs/design.md §3.12` |
+| `process.minlo.call` / `provide` 字段 | `src/commands/run.ts` (call 安装 + provides 镜像) + `src/lib/loader.ts` (字段校验) + `docs/design.md §3.12` |
 | 全局能力 | `global-assets/abilities/` + `scripts/install-global-helloworld.js` |
 | 用户模板 | `templates/missions/default.json` + `scripts/copy-templates.mjs` |
 
@@ -118,7 +117,7 @@ npm publish         # postinstall 钩子会自动跑
 `npm test` 跑 `node --test test/`。本项目目前测试覆盖度较低,新增能力 / 关键路径前请补 `test/<name>.test.mjs` 形式的 `node:test` 用例。
 
 - 测纯函数 / 模块:**直接**在 `test/<name>.test.mjs` 里 `import` + `node:test`
-- 测 `process:minlo` 虚拟模块(需要 loader hook):用 `test/run-process-minlo-tests.mjs` 作入口——它在**当前进程**里 `register()` hook,然后 dynamic import 测试文件
+- 测 `process.minlo.call` 行为:写一个小型能力 export `provide`,在测试 mission JSON 里引用它 + 另一个用 `call` 调用的 ability,跑 `minlo run` 并断言 stderr 输出(端到端风格)
 
 ## 报告 issue
 

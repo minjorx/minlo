@@ -1,24 +1,19 @@
-// counter.js — example ability that exports a counter API via
-// process:minlo. Other abilities call the counter function set via
-// process:minlo to get the shared { increment, get, reset } functions.
+// counter.js — example ability that exposes a counter API via the
+// `provide` field. Other abilities call the API through
+// `process.minlo.call('counter.<fn>', ...)`:
 //
-// Note: this ability file is .js, not .ts. The process:minlo
-// virtual specifier only works in .js (tsx's esbuild pipeline does
-// not know about it — see docs/design.md §3.12).
+//   process.minlo.call('counter.increment');
+//   const n = process.minlo.call('counter.get');
 //
-// counter has a trivial init() because the strict 7-field schema
-// requires at least one of init / execute / destroy. The actual
-// `provide()` call happens at module-load time (when the ability
-// file is imported), so init is just there to satisfy the loader.
-
-import { provide } from 'process:minlo';
+// State is held in a closure variable `n`; the same `counter` module
+// is loaded once per process, so all callers share the same counter.
 
 export const name = 'counter';
-export const description = '示例能力：provide 计数器,其他能力可通过 process:minlo 调用';
+export const description = '提供计数器 API(供其他能力调用)';
 
 let n = 0;
 
-provide('counter', {
+export const provide = {
   increment() {
     n += 1;
     return n;
@@ -29,8 +24,12 @@ provide('counter', {
   reset() {
     n = 0;
   },
-});
+};
 
+// Trivial init is required because the strict 8-field schema (see
+// docs/design.md §3.1) requires at least one of init / execute /
+// destroy. The actual API is already registered on the module
+// instance at import time, so init has nothing to do.
 export async function init() {
-  // No-op. See file header.
+  // no-op
 }

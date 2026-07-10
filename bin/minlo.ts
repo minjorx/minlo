@@ -11,50 +11,15 @@
 // the bin file until we find a directory containing package.json with our
 // `name` field — that is unambiguously the package root.
 //
-// FIRST: install the `process:minlo` ESM loader hook. This must happen
-// before any ability file is dynamically imported. The hook intercepts
-// `import { use, provide } from 'process:minlo'` in ability files (see
-// docs/design.md §3.12). Abilities that do NOT use this virtual module
-// are unaffected — the hook only resolves the `process:minlo` specifier
-// and passes everything else through to Node's default loader.
-//
 // Before delegating to run(), we lazily create the user-global `~/.minlo/`
-// directory if missing (per CLAUDE.md §3.6). This is a no-op on subsequent
-// runs.
-import { register } from 'node:module';
+// directory if missing (per docs/design.md §3.6). This is a no-op on
+// subsequent runs.
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
-
-// Install the loader hook relative to this file's URL. From the bin entry
-// (which is the very first thing Node loads), we resolve the hook at a
-// known sibling path under dist/src/lib/ (tsc preserves the source tree
-// under dist/). This works in both `npm link` (where dist/ lives next
-// to bin/) and in development (where the script is run via tsx against
-// source).
-const here = dirname(fileURLToPath(import.meta.url));
-// Try dist/src/lib/minlo-loader-hook.js first (built artifact); fall back
-// to src/lib/ for tsx dev.
-const candidates = [
-  resolve(here, '..', 'dist', 'src', 'lib', 'minlo-loader-hook.js'),
-  resolve(here, '..', 'src', 'lib', 'minlo-loader-hook.ts'),
-  resolve(here, '..', 'src', 'lib', 'minlo-loader-hook.js'),
-];
-const hookPath = candidates.find((p) => existsSync(p));
-if (!hookPath) {
-  console.error(
-    `minlo: cannot locate minlo-loader-hook under any of:\n` +
-      candidates.map((p) => `  - ${p}`).join('\n') +
-      `\n       Make sure you ran 'npm run build' before running minlo.`,
-  );
-  process.exit(1);
-}
-// module.register() on Windows requires a file:// URL, not a bare path.
-register(pathToFileURL(hookPath).href, import.meta.url);
-
-const { run } = await import('../src/index.js');
+import { run } from '../src/index.js';
 
 interface PackageMetadata {
   name: string;

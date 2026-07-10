@@ -98,12 +98,13 @@ my-mission-project/
 | `destroy` | function | ❌（三选一至少一个） | 生命周期钩子：主循环结束时由加载器显式调用（详见 §5.4） |
 | `deps` | `string[]` | ❌ | 依赖的能力 `name` 列表（详见 §3.7）——只控制 `init` 顺序，不传递数据 |
 | `externalDeps` | `string[]` | ❌ | 依赖的 npm 包名列表（详见 §3.10）——框架启动时检查 node_modules 是否安装，**不**自动 npm install |
+| `provide` | `Record<string, Function>` | ❌ | 暴露给其他能力的 API（详见 §3.12）——`process.minlo.call('<self>.<fn>', ...args)`。值必须全是 function |
 
 **严格 schema 校验**（加载时由框架执行，详见 §5.3）：
 
 - 缺少 `name` 或 `description` → 该文件被忽略，stderr 输出警告，进程**不**退出
 - 同时缺失 `init` / `execute` / `destroy` 三者 → 该文件被忽略，stderr 输出警告
-- 导出 7 个允许字段之外的任何字段 → 该文件被忽略，stderr 输出警告
+- 导出 8 个允许字段之外的任何字段 → 该文件被忽略，stderr 输出警告
 - 框架不解释能力的"角色"——能力作者决定 `init` / `execute` / `destroy` 的语义；智能体只通过 `name` 引用能力
 
 **v1 不再保留的字段**：
@@ -556,94 +557,98 @@ minlo run chat
 
 ---
 
-### 3.12 跨能力 API 直调：`process:minlo` 虚拟模块
+### 3.12 跨能力 API 调用：`provide` 字段 + `process.minlo.call`
 
-> **v1.1 引入**——`process:minlo` 让能力 A `provide` 一个 API、让能力 B 用 `use` 拿到后**直接当本地函数调用**,不需要每次写 `process.minlo.ctx.a.xxx()`。
+> **v1.1 引入**——能力 A 通过 `provide` 字段声明 API;能力 B 用 `process.minlo.call('<A>.<fn>', ...args)` 调用。比 `process.minlo.ctx`（§3.8）短得多,且完全基于 ESM 字段 + schema 校验——**无** loader hook、**无** Node 22 升级、**无** regex 静态扫描。
 
 #### 3.12.1 动机
 
 `process.minlo.ctx`（§3.8）解决了"能力间共享状态"问题,但调用语法繁琐:
 
 ```js
-// 每次都要写 ctx.<name>.<fn>(args)
+// ctx 写法: 每次都要写 ctx.<name>.<fn>(args)
 process.minlo.ctx.logger.log('hi');
 ```
 
-`process:minlo` 是一个由 minlo 自己的 ESM loader hook 解析的**虚拟模块 specifier**,在能力文件里这么写:
+`process.minlo.call` 提供了更短的写法:
 
 ```js
-import { use } from 'process:minlo';
-
-const { log } = use('logger');
-log('hi');   // 看起来像普通函数调用
+// call 写法: 直接传点分路径
+process.minlo.call('logger.log', 'hi');
 ```
+
+**v1.0 早期方案** 曾经尝试用 `process:minlo` 虚拟模块 + `import { use } from 'process:minlo'` 拿到直调语法。该方案要求 Node ≥ 22 + ESM loader hook + 用 regex 做静态校验,带来 50-200ms 冷启动、跨平台 shebang 复杂度、对描述字符串的 false positive。最终被否决——A 方案用最少的机制达到 80% 的可读性,保留 Node 16+ 兼容,**无新增工具链依赖**。
 
 #### 3.12.2 API
 
-虚拟模块导出两个函数:
-
-| 函数 | 何时调用 | 作用 |
+| 字段 / 函数 | 位置 | 作用 |
 |---|---|---|
-| `provide(name, apiObject)` | 在能力 `init` 或模块顶层调用 | 把自己暴露的 API 注册到 `process.minlo.provides[name]`。`apiObject` 必须是普通对象,值必须全是函数 |
-| `use(name)` | 在能力 `execute` 调用 | 返回 `process.minlo.provides[name]` 的引用。`name` 必须在 `deps` 里声明(拓扑序保证目标能力已 init) |
+| `provide` (字段) | 能力 export | 把自己暴露的 API 声明为 `{ [fnName]: function }` 形式的对象。loader 在 init 后把每个 in-scope 能力的 `provide` 挂到 `process.minlo.provides[cap.name]` |
+| `process.minlo.call(path, ...args)` | 调用方调用 | `path` 形如 `'<ability>.<fn>'`——按 `.` 切分,在 `provides` 里找到函数,调用并返回结果(抛出函数自己的异常) |
 
 **示例——提供方(`counter.js`)**:
 
 ```js
-import { provide } from 'process:minlo';
-
 export const name = 'counter';
 export const description = '提供计数器 API';
 
 let n = 0;
 
-provide('counter', {
+export const provide = {
   increment() { n += 1; return n; },
   get() { return n; },
   reset() { n = 0; },
-});
+};
 
-// 必须有至少一个 init/execute/destroy(7 字段 schema 要求)
-export async function init() { /* provide 已在 import 阶段完成 */ }
+// 必须有至少一个 init/execute/destroy(8 字段 schema 要求)
+export async function init() { /* provide 已在 import 阶段就位 */ }
 ```
 
 **示例——使用方(`demo-user.js`)**:
 
 ```js
-import { use } from 'process:minlo';
-
 export const name = 'demo-user';
-export const deps = ['counter'];   // ← 必须声明 use 的目标
+export const deps = ['counter'];   // ← 必须声明 call 目标
 
 export async function execute() {
-  const counter = use('counter');
-  counter.increment();
+  const n = process.minlo.call('counter.increment');
+  process.stderr.write(`counter is now ${n}\n`);
   return { action: 'continue' };
 }
 ```
 
 #### 3.12.3 工作原理
 
-`bin/minlo.ts` 在最早(`import` 任何用户模块之前)调用 `module.register('./dist/src/lib/minlo-loader-hook.js', import.meta.url)` 安装一个 ESM loader hook。hook 拦截 `process:minlo` specifier,返回一段**合成**的模块源码,这段源码提供 `provide` / `use` 两个函数,操作的是 `globalThis.__minlo_provides__` 上的 Map。
+**完全在主循环里完成**——不需要 ESM loader hook:
 
-**为什么 hook 不把 store 放 `process.minlo.provides`**:主循环在 `init` 之前才创建 `process.minlo` 命名空间;但能力文件可能**在** init 之前(`import` 时)就调用 `provide`(`process:minlo` 是 import 阶段就求值)。所以 store 在 hook 自己的 closure + `globalThis` 上,主循环 init 阶段结束后**镜像**一份到 `process.minlo.provides`(供 `minlo list` / 调试工具读)。
+1. **能力加载期**:`src/lib/loader.ts` 校验 `provide` 字段(必须是普通对象,值全是 function;不通过则整个 ability 被拒)
+2. **阶段 2(init 后,主循环开始前)**:`src/commands/run.ts` 遍历 in-scope 能力,把 `cap.instance.provide` 挂到 `process.minlo.provides[cap.name]`
+3. **能力 execute** 写 `process.minlo.call('counter.increment')`——主循环在 `run()` 入口处把 `minloCall` 装到 `process.minlo.call` 上
 
-#### 3.12.4 静态校验
+#### 3.12.4 校验
 
-主循环在阶段 1 步骤 3.5 用 regex 扫每个能力文件,做两类检查:
+校验**完全**由 `src/lib/loader.ts` 的 schema 校验承担——`provide` 字段在能力加载期就被严格检查:
 
-- **`provide('xxx', ...)` 中的 `xxx` 必须等于能力自己的 `name`**——一个能力只能在自己名下发布 API
-- **`use('xxx')` 中的 `xxx` 必须在 `deps` 里**——确保拓扑序能保证目标能力的 `provide` 已执行
+- 不存在 → 通过(可选字段)
+- 存在但不是普通对象 → 拒绝该 ability
+- 存在但某个值不是 function → 拒绝该 ability
 
-`process:minlo` 必须由 `.js` 文件 import(`.ts` 走 tsx/esbuild,不认识这个虚拟 specifier);**`@types/node` ≥ 22** 提供 `LoadHook` / `ResolveHook` 类型,本项目就此硬约束 **Node ≥ 22**。
+调用方写 `process.minlo.call('counter.fn', ...)` 是普通 ESM 字段访问——**IDE 直接补全**;写错的能力名 / 函数名**运行时**抛清晰错误:
+
+```
+process.minlo.call: no ability "counter" has registered a provide. Available: logger, demo. Check that the provider is in the mission and exports `provide`.
+
+process.minlo.call: ability "counter" provides no function "noSuchFn". Available on this ability: increment, get, reset.
+```
+
+**`use` 目标仍要求在 `deps` 里**——这是 §3.7 的拓扑序保证,跟 `process.minlo.call` 无关,任何能力引用别的能力都必须声明 deps。
 
 #### 3.12.5 已知限制 (v1)
 
-- **描述/注释里的 `use('xxx')` 字符串会被 regex 误判**——v1 接受这个 false positive,要求作者把 `use(...)` / `provide(...)` 字面量写在 description 字符串和注释外
-- **冷启动开销约 50-200ms**——`module.register()` + worker thread 加载 hook 的固定成本,只发生一次,后续 `minlo run` 不变慢
-- **能力不能既 import `process:minlo` 又是 `.ts` 文件**——tsx 的 esbuild 不识别虚拟 specifier
-- **`provide` 不支持嵌套路径**——只 `use('counter')`,不能 `use('counter.advanced')`
-- **`use` 返回的引用是 `process.minlo.provides[name]` 的直接引用,不是快照**——目标能力如果在 `init` 之后**重新调用** `provide` 替换对象,使用方会看到新对象(但这是异常情况,不在 v1 设计承诺里)
+- **调用语法 `process.minlo.call('a.b', ...)` 仍是函数调用**——不是裸的 `log('hi')` 直调。这是 A 方案相对 C 方案(被否决)的**可读性 trade-off**——为了避免 loader hook / Node 22 升级 / regex 校验这 3 个更大的代价
+- **`provide` 只支持平铺函数名**——不能 `call('counter.advanced.increment')`。`fnName` 必须在 `provide` 对象上直接存在
+- **`call` 返回函数的实际返回值**——能力作者若返回 Promise,调用方拿到的也是 Promise(v1 不会自动 `await`)
+- **`provide` 注册一次后不能改对象引用**——如果在 `init` 之后**重新赋值** `cap.instance.provide`,主循环在 init 阶段已经镜像过,`process.minlo.provides` 不会更新(正常能力不会这么干)
 
 ---
 
@@ -746,7 +751,7 @@ export async function execute() {
    - `name` 必填且为 string
    - `description` 必填且为 string
    - `init` / `execute` / `destroy` 至少有一个为 function
-   - 导出对象的键**只能是** `name` / `description` / `init` / `execute` / `destroy` / `deps` / `externalDeps`——任何其他键（含 `type` / `order` / `config` / `chat` 等）出现即拒绝
+   - 导出对象的键**只能是** `name` / `description` / `init` / `execute` / `destroy` / `deps` / `externalDeps` / `provide`——任何其他键（含 `type` / `order` / `config` / `chat` 等）出现即拒绝
 5. 冲突处理：本地覆盖全局；同目录重名时后者覆盖前者并警告
 6. 通过校验的能力进入注册表；未通过的从注册表中移除
 
@@ -880,7 +885,7 @@ Minlo **不**对 `abilities/` `missions/` 做 `fs.watch`：
 | 特性 | 原因 |
 |---|---|
 | 任务继承（extends） | 避免隐式依赖和配置漂移，保持配置完全自包含 |
-| 能力的 `type` 字段 | v1 能力没有"角色"——接口严格 7 字段（详见 §3.1） |
+| 能力的 `type` 字段 | v1 能力没有"角色"——接口严格 8 字段（详见 §3.1） |
 | 能力方法名别名（`chat` / `get` / `retrieve` / `beforeStep` 等） | 仅识别 `init` / `execute` / `destroy` 三个固定函数名 |
 | 能力的 `order` 字段 | v1 不保留——同阶段内多能力顺序按 `mission.abilities` 数组顺序 |
 | mission.json 的 `loop` 字段 | v1 不存在——主循环是死循环；退出由能力 `execute` 返回值或异常控制（详见 §4.2） |
@@ -897,7 +902,7 @@ Minlo **不**对 `abilities/` `missions/` 做 `fs.watch`：
 |---|---|
 | 能力执行沙箱 | `execute` 运行在 Node.js 主进程，建议用户自行实现安全校验（如白名单、参数校验） |
 | 配置文件校验 | 加载任务 JSON 时进行严格校验，防止非法引用导致崩溃 |
-| 能力 schema 校验 | 加载时按 §5.3 严格校验 7 字段；多出字段（含 `type` / `order` 等）拒绝该文件 |
+| 能力 schema 校验 | 加载时按 §5.3 严格校验 8 字段；多出字段（含 `type` / `order` 等）拒绝该文件 |
 | 凭据管理 | 任务 JSON 不存储 API Key 等敏感信息，凭据应放在 `.env` 中（v1 由用户自管） |
 | 路径遍历 | 工作区路径严格限制在 `.minlo/workspace/` 内，防止能力读写任意系统文件 |
 

@@ -5,7 +5,7 @@
 //   阶段 2: 死循环（每轮顺序 execute，按 action 协议决定继续/退出）
 //   阶段 3: 倒序 destroy
 //   阶段 4: 进程退出
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { createRequire } from 'node:module';
@@ -15,7 +15,6 @@ import {
   scanExternalDeps,
   type CapabilityRecord,
 } from '../lib/loader.js';
-import { getProvides } from '../lib/minlo-loader-hook.js';
 import {
   topoSort,
   DependencyNotFoundError,
@@ -36,25 +35,12 @@ interface MinloNamespace {
   ctx: Record<string, unknown>;
   // configs[name] = mission.capabilities[].config for that ability
   configs: Record<string, Record<string, unknown>>;
-  // provides: mirror of the loader hook's store. The hook in
-  // src/lib/minlo-loader-hook.ts owns the actual Map; we copy it
-  // here in phase 2 so `minlo list` / debug tooling can read
-  // process.minlo.provides without depending on the hook module.
+  // provides[name] = { fn1, fn2, ... } — written in phase 2 by reading
+  // each in-scope ability's `provide` field (see docs/design.md §3.12).
+  // Other abilities access these via `process.minlo.call(name.fn, args)`.
   provides: Record<string, Record<string, (...args: unknown[]) => unknown>>;
-}
-
-/**
- * Best-effort source read for an ability file. Returns empty string on
- * read failure (we don't want a permission error on a sibling file to
- * abort the whole run; the loader will report the real problem when
- * it tries to import the file).
- */
-function readFileSafely(p: string): string {
-  try {
-    return readFileSync(p, 'utf8');
-  } catch {
-    return '';
-  }
+  // call: framework-installed helper. See minloCall() below.
+  call: (path: string, ...args: unknown[]) => unknown;
 }
 
 function ensureMinloNamespace(): MinloNamespace {
@@ -63,13 +49,56 @@ function ensureMinloNamespace(): MinloNamespace {
   // into other processes / REPLs sharing the same global object.
   const p = process as NodeJS.Process & { minlo?: MinloNamespace };
   if (!p.minlo) {
-    p.minlo = { ctx: {}, configs: {}, provides: {} };
+    p.minlo = { ctx: {}, configs: {}, provides: {}, call: minloCall };
   } else {
     if (!p.minlo.ctx) p.minlo.ctx = {};
     if (!p.minlo.configs) p.minlo.configs = {};
     if (!p.minlo.provides) p.minlo.provides = {};
   }
   return p.minlo;
+}
+
+/**
+ * Call a function exposed by an ability via its `provide` field.
+ *
+ * Signature: `process.minlo.call('logger.log', 'hello')` resolves to
+ * `process.minlo.provides.logger.log('hello')` and returns whatever
+ * the function returns (or throws if it throws).
+ *
+ * Errors are wrapped with a clear message so ability authors can
+ * locate the problem without a stack-dive:
+ *   - "no ability named 'X'"     — X is not in the registry or has no provide
+ *   - "ability 'X' provides no function 'Y'" — X is here but the path is wrong
+ *   - "(propagates the function's own error)"
+ */
+function minloCall(path: string, ...args: unknown[]): unknown {
+  const p = process as NodeJS.Process & { minlo?: MinloNamespace };
+  const provides = p.minlo?.provides ?? {};
+  const dot = path.indexOf('.');
+  if (dot < 0) {
+    throw new Error(
+      `process.minlo.call: invalid path ${JSON.stringify(path)} — expected '<ability>.<fn>' (e.g. 'logger.log')`,
+    );
+  }
+  const ability = path.slice(0, dot);
+  const fn = path.slice(dot + 1);
+  const api = provides[ability];
+  if (!api) {
+    const have = Object.keys(provides).join(', ') || '<none>';
+    throw new Error(
+      `process.minlo.call: no ability ${JSON.stringify(ability)} has registered a provide. ` +
+        `Available: ${have}. Check that the provider is in the mission and exports \`provide\`.`,
+    );
+  }
+  const fnRef = api[fn];
+  if (typeof fnRef !== 'function') {
+    const have = Object.keys(api).join(', ') || '<none>';
+    throw new Error(
+      `process.minlo.call: ability ${JSON.stringify(ability)} provides no function ${JSON.stringify(fn)}. ` +
+        `Available on this ability: ${have}.`,
+    );
+  }
+  return fnRef.apply(api, args);
 }
 
 /**
@@ -232,77 +261,15 @@ export async function runMain(opts: RunOptions): Promise<number> {
   }
   console.log(`minlo: init order: ${orderedCaps.map((c) => c.name).join(' → ')}`);
 
-  // === 阶段 1 步骤 3.5: process:minlo 静态校验 ===
-  // For every in-scope ability we read its source and look for
-  //   - `import ... from 'process:minlo'`  → mark as a user of the
-  //     virtual module (must be .js, not .ts — tsx's esbuild does not
-  //     know about this specifier).
-  //   - `use('xxx')` calls                 → 'xxx' must appear in deps.
-  //   - `provide('xxx', ...)` calls        → 'xxx' must equal the
-  //     ability's own name (a capability can only publish under its
-  //     own identifier).
-  // Failures here are non-fatal: the ability is kept in the registry
-  // and will simply be unable to use process:minlo at runtime. The
-  // reason we don't reject the whole run is that the user might be
-  // mid-edit; we just print the error and skip the call. The runtime
-  // `use()` will throw later if the user ignores the warning.
-  for (const cap of inScopeRecords) {
-    if (!cap.filePath.endsWith('.js')) {
-      // .ts files are loaded via tsx, which does not know about the
-      // process:minlo virtual specifier. Abilities that import
-      // process:minlo must be .js — see docs/design.md §3.12.
-      const text = readFileSafely(cap.filePath);
-      if (text.includes(`from 'process:minlo'`) || text.includes(`from "process:minlo"`)) {
-        console.error(
-          `minlo: ${cap.name} (${cap.filePath}) imports 'process:minlo' but is a .ts file. ` +
-            `process:minlo only works in .js abilities (tsx's esbuild does not know about ` +
-            `the virtual specifier). Rename to .js or stop using process:minlo.`,
-        );
-      }
-      continue;
-    }
-    const text = readFileSafely(cap.filePath);
-    if (!text.includes(`from 'process:minlo'`) && !text.includes(`from "process:minlo"`)) {
-      continue;
-    }
-
-    // v1 caveat: we scan with regex on the raw source. A `use('xxx')`
-    // hit inside a string literal (e.g. `description = "use('counter')"`)
-    // would be a false positive. The v1 doc tells ability authors to
-    // keep `use(...)` and `provide(...)` calls out of description
-    // strings and comments. The reverse failure (treating real
-    // `use('counter')` calls as strings) is much worse.
-
-    // 1. provide('xxx', ...) → xxx must equal cap.name
-    const provideRe = /\bprovide\(\s*['"]([a-zA-Z0-9_-]+)['"]/g;
-    let m: RegExpExecArray | null;
-    while ((m = provideRe.exec(text)) !== null) {
-      const provided = m[1];
-      if (provided !== cap.name) {
-        console.error(
-          `minlo: ${cap.name} calls provide(${JSON.stringify(provided)}, ...) — ` +
-            `a capability can only provide under its own name. ` +
-            `Either change the argument to ${JSON.stringify(cap.name)} or rename the ability.`,
-        );
-      }
-    }
-    // 2. use('xxx') → xxx must be in deps
-    const useRe = /\buse\(\s*['"]([a-zA-Z0-9_-]+)['"]/g;
-    while ((m = useRe.exec(text)) !== null) {
-      const used = m[1];
-      if (!cap.deps.includes(used)) {
-        console.error(
-          `minlo: ${cap.name} calls use(${JSON.stringify(used)}, ...) — ` +
-            `every use() target must be declared in deps so the framework ` +
-            `can guarantee topo-order init. Add ${JSON.stringify(used)} to ${cap.name}'s deps.`,
-        );
-      }
-    }
-  }
-
   // === 阶段 1 步骤 4: 创建 minlo 命名空间 + minlo.ctx + minlo.configs ===
   // 框架在 init 之前确保 minlo.ctx 与 minlo.configs 存在；能力 init 里可以放心读写。
   const ns = ensureMinloNamespace();
+  // Attach process.minlo.call so abilities can reach any provided API
+  // as `process.minlo.call('ability.fn', ...args)`. We re-attach on
+  // every run() in case the process is reused (it isn't in practice —
+  // each `minlo run` is a fresh node process — but it's a cheap
+  // idempotent assignment).
+  (process as NodeJS.Process & { minlo: MinloNamespace & { call: typeof minloCall } }).minlo.call = minloCall;
   for (const ref of mission.capabilities) {
     if (ref.config !== undefined) {
       ns.configs[ref.name] = ref.config;
@@ -329,12 +296,15 @@ export async function runMain(opts: RunOptions): Promise<number> {
     }
   }
 
-  // Mirror the loader hook's provides store into process.minlo.provides
-  // now that every ability's init has run. Abilities' use() calls in
-  // execute() read the loader hook's own store directly (via the
-  // virtual module's closure), so this mirror is purely for
-  // introspection — minlo list, debug tooling, future features.
-  ns.provides = { ...getProvides() };
+  // Phase 2 step 4.5: seed process.minlo.provides from each in-scope
+  // ability's `provide` field. Other abilities can now reach these
+  // functions via `process.minlo.call('<name>.<fn>', ...args)`.
+  for (const cap of orderedCaps) {
+    const api = (cap.instance as { provide?: Record<string, (...args: unknown[]) => unknown> }).provide;
+    if (api && typeof api === 'object') {
+      ns.provides[cap.name] = api;
+    }
+  }
 
   // === 阶段 3: 死循环 ===
   console.log('minlo: main loop (Ctrl-C to abort)...');

@@ -31,7 +31,7 @@ export interface CapabilityRecord {
 }
 
 const ALLOWED_KEYS = new Set([
-  'name', 'description', 'init', 'execute', 'destroy', 'deps', 'externalDeps',
+  'name', 'description', 'init', 'execute', 'destroy', 'deps', 'externalDeps', 'provide',
 ]);
 
 export interface LoadOptions {
@@ -195,6 +195,30 @@ function validateCapability(
       return null;
     }
     externalDeps = instance.externalDeps as string[];
+  }
+
+  // 7. provide (optional) — must be a plain object whose values are all
+  //    functions. When present, the framework exposes this object to
+  //    other abilities via `process.minlo.call('<name>.<fn>', ...args)`.
+  //    See docs/design.md §3.12 (v1.1 — replaces the rejected
+  //    `process:minlo` virtual-module design).
+  if (instance.provide !== undefined) {
+    if (instance.provide === null || typeof instance.provide !== 'object' || Array.isArray(instance.provide)) {
+      console.error(
+        `minlo: reject ${relativeIn('', filePath)} — ` +
+          `"${name}" provide must be a plain object of { [fnName]: function }`,
+      );
+      return null;
+    }
+    for (const [k, v] of Object.entries(instance.provide as Record<string, unknown>)) {
+      if (typeof v !== 'function') {
+        console.error(
+          `minlo: reject ${relativeIn('', filePath)} — ` +
+            `"${name}" provide["${k}"] must be a function`,
+        );
+        return null;
+      }
+    }
   }
 
   return {
