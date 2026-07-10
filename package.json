@@ -1,0 +1,38 @@
+{
+  "name": "minlo",
+  "version": "0.1.0",
+  "description": "Minlo project CLI",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "minlo": "./dist/bin/minlo.js"
+  },
+  "files": [
+    "dist",
+    "templates",
+    "global-assets",
+    "scripts",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-templates.mjs",
+    "start": "node dist/bin/minlo.js",
+    "dev": "tsx bin/minlo.ts",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "link": "npm run build && npm link",
+    "unlink": "npm unlink --global minlo",
+    "install:global": "node scripts/install-global-helloworld.js",
+    "test": "node --test test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

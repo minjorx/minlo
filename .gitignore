@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Capability workspace (per CLAUDE.md §2.1 — "建议忽略")
+# When a user runs `minlo init` in another project, .minlo/workspace/ is created
+# there. Inside THIS repo we don't run minlo as an end-user, but if someone does
+# (e.g. `minlo list` for self-test), this prevents accidentally committing the
+# scratch data.
+.minlo/workspace/
