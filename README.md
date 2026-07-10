@@ -84,6 +84,46 @@ minlo run calc
 
 主循环会一直调用 `calculator.execute`(返回普通对象,等价 `action: 'continue'`)。Ctrl-C 退出。
 
+## 能力间互相调用(provide / use)
+
+> v1.1 引入,见 [docs/design.md §3.12](docs/design.md#312-跨能力-api-直调processminlo-虚拟模块)。
+
+如果你的能力想暴露 API 给其他能力,或想用其他能力的 API,**别**在 `process.minlo.ctx` 里手挂对象 —— 改用 `process:minlo` 虚拟模块:
+
+```js
+// .minlo/abilities/logger.js
+import { provide } from 'process:minlo';
+
+export const name = 'logger';
+export const description = '提供 log / warn';
+
+provide('logger', {
+  log:  (m) => process.stderr.write(`[log]  ${m}\n`),
+  warn: (m) => process.stderr.write(`[warn] ${m}\n`),
+});
+
+export async function init() { /* provide 已在 import 阶段完成 */ }
+```
+
+```js
+// .minlo/abilities/other.js
+import { use } from 'process:minlo';
+
+export const name = 'other';
+export const deps = ['logger'];   // ← 必须声明
+
+export async function execute() {
+  const { log } = use('logger');
+  log('hi');   // 看起来就是普通函数调用
+}
+```
+
+**约束**:
+- `use` 的目标必须在 `deps` 里(框架启动期静态校验)
+- `provide` 必须在能力自己的 `name` 下注册
+- 用了 `process:minlo` 的能力文件必须是 **`.js`** —— Node ≥ 22,tsx/esbuild 不支持
+- 完整设计动机 / 工作原理 / 已知限制见 [`docs/design.md §3.12`](docs/design.md#312-跨能力-api-直调processminlo-虚拟模块)
+
 ## 给能力传配置
 
 任务 JSON 里把字符串换成 `{ "name": ..., "config": ... }`:
@@ -173,8 +213,8 @@ minlo run
 
 | 文档 | 受众 | 内容 |
 |---|---|---|
-| [README.md](README.md) | 使用者 | 介绍、安装、快速开始、CLI、第一个能力 |
-| [docs/design.md](docs/design.md) | 高级用户 / 能力作者 | 完整设计文档(能力 schema、生命周期、配置、依赖、CLI) |
+| [README.md](README.md) | 使用者 | 介绍、安装、快速开始、CLI、第一个能力、`process:minlo` |
+| [docs/design.md](docs/design.md) | 高级用户 / 能力作者 | 完整设计文档(能力 schema、生命周期、配置、依赖、CLI、`process:minlo` v1.1) |
 | [docs/examples/weather.md](docs/examples/weather.md) | 使用者 | 端到端:开发 + 调试一个能力 |
 | [docs/examples/multi-mission.md](docs/examples/multi-mission.md) | 使用者 | 多 mission + 跨 run 持久化 |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 贡献者 | 仓库结构、开发命令、修改规范、测试 |

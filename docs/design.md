@@ -9,6 +9,7 @@
 1. [项目概述](#1-项目概述)
 2. [目录结构规范](#2-目录结构规范)
 3. [核心概念定义](#3-核心概念定义)
+   - [3.12 跨能力 API 直调：process:minlo 虚拟模块](#312-跨能力-api-直调processminlo-虚拟模块)
 4. [执行生命周期与顺序界定](#4-执行生命周期与顺序界定)
 5. [能力发现与启动期注册](#5-能力发现与启动期注册)
 6. [CLI 命令规范](#6-cli-命令规范)
@@ -552,6 +553,97 @@ minlo run chat
 - config 注入 `process.minlo.configs.llm`
 - 多轮对话由闭包里的 `messages` 数组累积；用 `ctx.llm` 暴露给其他能力观察
 - execute 总是返回 `{ action: 'continue' }`（除非 stdin 关闭）—— 退出靠 Ctrl-C 或 Ctrl-D
+
+---
+
+### 3.12 跨能力 API 直调：`process:minlo` 虚拟模块
+
+> **v1.1 引入**——`process:minlo` 让能力 A `provide` 一个 API、让能力 B 用 `use` 拿到后**直接当本地函数调用**,不需要每次写 `process.minlo.ctx.a.xxx()`。
+
+#### 3.12.1 动机
+
+`process.minlo.ctx`（§3.8）解决了"能力间共享状态"问题,但调用语法繁琐:
+
+```js
+// 每次都要写 ctx.<name>.<fn>(args)
+process.minlo.ctx.logger.log('hi');
+```
+
+`process:minlo` 是一个由 minlo 自己的 ESM loader hook 解析的**虚拟模块 specifier**,在能力文件里这么写:
+
+```js
+import { use } from 'process:minlo';
+
+const { log } = use('logger');
+log('hi');   // 看起来像普通函数调用
+```
+
+#### 3.12.2 API
+
+虚拟模块导出两个函数:
+
+| 函数 | 何时调用 | 作用 |
+|---|---|---|
+| `provide(name, apiObject)` | 在能力 `init` 或模块顶层调用 | 把自己暴露的 API 注册到 `process.minlo.provides[name]`。`apiObject` 必须是普通对象,值必须全是函数 |
+| `use(name)` | 在能力 `execute` 调用 | 返回 `process.minlo.provides[name]` 的引用。`name` 必须在 `deps` 里声明(拓扑序保证目标能力已 init) |
+
+**示例——提供方(`counter.js`)**:
+
+```js
+import { provide } from 'process:minlo';
+
+export const name = 'counter';
+export const description = '提供计数器 API';
+
+let n = 0;
+
+provide('counter', {
+  increment() { n += 1; return n; },
+  get() { return n; },
+  reset() { n = 0; },
+});
+
+// 必须有至少一个 init/execute/destroy(7 字段 schema 要求)
+export async function init() { /* provide 已在 import 阶段完成 */ }
+```
+
+**示例——使用方(`demo-user.js`)**:
+
+```js
+import { use } from 'process:minlo';
+
+export const name = 'demo-user';
+export const deps = ['counter'];   // ← 必须声明 use 的目标
+
+export async function execute() {
+  const counter = use('counter');
+  counter.increment();
+  return { action: 'continue' };
+}
+```
+
+#### 3.12.3 工作原理
+
+`bin/minlo.ts` 在最早(`import` 任何用户模块之前)调用 `module.register('./dist/src/lib/minlo-loader-hook.js', import.meta.url)` 安装一个 ESM loader hook。hook 拦截 `process:minlo` specifier,返回一段**合成**的模块源码,这段源码提供 `provide` / `use` 两个函数,操作的是 `globalThis.__minlo_provides__` 上的 Map。
+
+**为什么 hook 不把 store 放 `process.minlo.provides`**:主循环在 `init` 之前才创建 `process.minlo` 命名空间;但能力文件可能**在** init 之前(`import` 时)就调用 `provide`(`process:minlo` 是 import 阶段就求值)。所以 store 在 hook 自己的 closure + `globalThis` 上,主循环 init 阶段结束后**镜像**一份到 `process.minlo.provides`(供 `minlo list` / 调试工具读)。
+
+#### 3.12.4 静态校验
+
+主循环在阶段 1 步骤 3.5 用 regex 扫每个能力文件,做两类检查:
+
+- **`provide('xxx', ...)` 中的 `xxx` 必须等于能力自己的 `name`**——一个能力只能在自己名下发布 API
+- **`use('xxx')` 中的 `xxx` 必须在 `deps` 里**——确保拓扑序能保证目标能力的 `provide` 已执行
+
+`process:minlo` 必须由 `.js` 文件 import(`.ts` 走 tsx/esbuild,不认识这个虚拟 specifier);**`@types/node` ≥ 22** 提供 `LoadHook` / `ResolveHook` 类型,本项目就此硬约束 **Node ≥ 22**。
+
+#### 3.12.5 已知限制 (v1)
+
+- **描述/注释里的 `use('xxx')` 字符串会被 regex 误判**——v1 接受这个 false positive,要求作者把 `use(...)` / `provide(...)` 字面量写在 description 字符串和注释外
+- **冷启动开销约 50-200ms**——`module.register()` + worker thread 加载 hook 的固定成本,只发生一次,后续 `minlo run` 不变慢
+- **能力不能既 import `process:minlo` 又是 `.ts` 文件**——tsx 的 esbuild 不识别虚拟 specifier
+- **`provide` 不支持嵌套路径**——只 `use('counter')`,不能 `use('counter.advanced')`
+- **`use` 返回的引用是 `process.minlo.provides[name]` 的直接引用,不是快照**——目标能力如果在 `init` 之后**重新调用** `provide` 替换对象,使用方会看到新对象(但这是异常情况,不在 v1 设计承诺里)
 
 ---
 
