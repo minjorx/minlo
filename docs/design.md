@@ -25,7 +25,7 @@
 
 ### 1.1 什么是 Minlo？
 
-Minlo 是一个面向 LLM Agent 开发的轻量级编排框架。它通过 **能力（Capability）** 与 **任务（Mission）** 两个核心概念，让开发者能够以"写 JS 逻辑 + 配 JSON 清单"的方式，快速组装和调试具备不同能力的 AI 智能体。
+Minlo 是一个面向 LLM Agent 开发的轻量级编排框架。它通过 **能力（Ability）** 与 **任务（Mission）** 两个核心概念，让开发者能够以"写 JS 逻辑 + 配 JSON 清单"的方式，快速组装和调试具备不同能力的 AI 智能体。
 
 ### 1.2 核心设计理念
 
@@ -81,7 +81,7 @@ my-mission-project/
 
 ## 3. 核心概念定义
 
-### 3.1 能力（Capability）
+### 3.1 能力（Ability）
 
 能力是最小功能单元，是一个遵循**严格 schema** 导出的 JavaScript/TypeScript 文件。**能力不允许 `type` 字段**——它的所有行为由它导出的函数决定。
 
@@ -122,7 +122,7 @@ my-mission-project/
 **设计约束**：
 
 - 文件名不参与排序或加载逻辑，仅作为人类阅读标识
-- 框架启动时扫描所有 JS/TS 文件，建立 `name → CapabilityRecord` 的内存注册表
+- 框架启动时扫描所有 JS/TS 文件，建立 `name → AbilityRecord` 的内存注册表
 - `name` 全局唯一——同目录内重名时后者覆盖前者并警告；本地与全局重名时**本地覆盖全局**并警告（详见 §3.6）
 - 支持 TypeScript：若项目安装了 `tsx`，框架自动加载 `.ts` 文件
 
@@ -245,7 +245,7 @@ for (const k of Object.keys(instance)) {
 - 框架不关心工作区内的具体文件格式，完全由能力自己管理
 - 清理工作区数据不会影响其他能力的运行（能力之间通过 `workspace/<name>/` 共享数据，删除某个子目录只影响对应能力）
 
-### 3.6 全局能力（Global Capabilities）
+### 3.6 全局能力（Global Abilities）
 
 能力可在两个位置声明：
 
@@ -727,7 +727,7 @@ process.minlo.call: ability "counter" provides no function "noSuchFn". Available
 
 ### 5.2 注册表结构
 
-启动期构建一份 `name → CapabilityRecord` 的内存注册表，存于运行时进程内：
+启动期构建一份 `name → AbilityRecord` 的内存注册表，存于运行时进程内：
 
 | 字段 | 说明 |
 |---|---|

@@ -2,7 +2,7 @@
 
 > 轻量级、可热插拔的 LLM Agent 运行时编排框架。
 
-Minlo 通过 **能力（Capability）** 与 **任务（Mission）** 两个核心概念,让你用"写 JS 逻辑 + 配 JSON 清单"的方式快速组装 AI 智能体。
+Minlo 通过 **能力（Ability）** 与 **任务（Mission）** 两个核心概念,让你用"写 JS 逻辑 + 配 JSON 清单"的方式快速组装 AI 智能体。
 
 - 能力 = 一个导出 `name` / `description` / `init` / `execute` / `destroy` 的 JS 文件
 - 任务 = 一个 JSON 文件,按 `name` 引用若干能力,可选传入 `config`
