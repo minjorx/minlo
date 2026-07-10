@@ -1002,3 +1002,4 @@ minlo run
 完整示例见 [`docs/examples/`](./examples/)：
 - [`weather.md`](./examples/weather.md) — 开发天气查询能力并调试
 - [`multi-mission.md`](./examples/multi-mission.md) — 多智能体 A/B 测试（v1 无会话）
+- [`provide-and-call.md`](./examples/provide-and-call.md) — 能力间通过 `provide` + `process.minlo.call` 互相调用

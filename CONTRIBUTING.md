@@ -23,8 +23,7 @@
 │   │   ├── loader.ts           # 扫描 / 校验能力文件,构建注册表
 │   │   ├── mission.ts          # 解析 <name[:fb]>、加载 .minlo/missions/<name>.json
 │   │   ├── topo.ts             # 按 deps 做拓扑排序
-│   │   ├── runtime.ts          # tsx 检测
-│   │   └── ability-registry.d.ts   # 共享类型(待补)
+│   │   └── runtime.ts          # tsx 检测
 │   └── commands/               # commander 子命令
 │       ├── init.ts             # `minlo init [--here]`
 │       ├── list.ts             # `minlo list`
