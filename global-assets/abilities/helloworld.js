@@ -1,8 +1,8 @@
 // Hello world capability — bundled with minlo, intended to be installed
-// into ~/.minlo/capabilities/ as a global default. Demonstrates the 5-field
-// schema (name / description required; init / execute / destroy all present
-// here as a complete example). Counts the number of execute calls and
-// returns { action: 'stop' } after 10 to exit the main loop.
+// into ~/.minlo/abilities/ as a global default. Demonstrates the full
+// schema (name / description required; init / execute / destroy all
+// present here as a complete example). Counts the number of execute calls
+// and returns { action: 'stop' } after 10 to exit the main loop.
 let executeCount = 0;
 
 export const name = 'helloworld';

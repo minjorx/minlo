@@ -15,8 +15,9 @@
 // No .env file is generated — env / secrets are the user's responsibility.
 // No ability files are generated — minlo does not ship example abilities.
 // The single `default.json` mission template is the only "starter" content
-// minlo ships; it provides a fallback for `minlo run` (no-arg mode) but has
-// an empty `abilities` array, so it does nothing on its own.
+// minlo ships; it provides a fallback for `minlo run` (no-arg mode) and
+// references the global `llm` ability so the new project is interactive
+// out of the box (requires OPENAI_API_KEY).
 import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,11 +30,11 @@ const MINLO_SCRIPTS: Record<string, string> = {
 
 /** Absolute path to the bundled default.json template, resolved from this file's location. */
 function defaultTemplatePath(): string {
-  // dist/src/commands/init.js → ../../templates/abilities/default.json
-  // src/commands/init.ts   → ../../templates/abilities/default.json
+  // dist/src/commands/init.js → ../../templates/missions/default.json
+  // src/commands/init.ts      → ../../templates/missions/default.json
   // Both layouts resolve the same way because the relative path is identical.
   const here = dirname(fileURLToPath(import.meta.url));
-  return resolve(here, '..', '..', 'templates', 'abilities', 'default.json');
+  return resolve(here, '..', '..', 'templates', 'missions', 'default.json');
 }
 
 function ensureDir(path: string): void {

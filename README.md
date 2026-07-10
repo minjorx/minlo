@@ -162,7 +162,7 @@ minlo run
 ├── src/                        # 框架核心
 │   ├── lib/                    # loader, mission 解析, topo 排序, runtime
 │   └── commands/               # init / list / run / version
-├── templates/abilities/        # `minlo init` 复制的 default.json
+├── templates/missions/        # `minlo init` 复制的 default.json
 ├── global-assets/abilities/    # helloworld + llm 装到 ~/.minlo/
 ├── scripts/                    # 构建 & postinstall
 ├── docs/                       # 设计文档 & 示例

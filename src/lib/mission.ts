@@ -168,13 +168,13 @@ function loadMission(
     }
   }
 
-  // Validate capabilities reference real capabilities
+  // Validate abilities reference real abilities
   const registered = new Set(registry.map((c) => c.name));
   for (const a of capabilities) {
     if (!registered.has(a.name)) {
       throw new Error(
-        `mission "${expectedName}" references unknown capability "${a.name}" ` +
-          `(check .minlo/capabilities/ or remove the reference)`,
+        `mission "${expectedName}" references unknown ability "${a.name}" ` +
+          `(check .minlo/abilities/ or remove the reference)`,
       );
     }
   }

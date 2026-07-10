@@ -107,7 +107,7 @@ npm publish         # postinstall 钩子会自动跑
 | Mission 解析 | `src/lib/mission.ts` + `docs/design.md §6.1.2` |
 | 主循环 | `src/commands/run.ts` + `docs/design.md §4` |
 | 全局能力 | `global-assets/abilities/` + `scripts/install-global-helloworld.js` |
-| 用户模板 | `templates/abilities/default.json` + `scripts/copy-templates.mjs` |
+| 用户模板 | `templates/missions/default.json` + `scripts/copy-templates.mjs` |
 
 ## 测试
 

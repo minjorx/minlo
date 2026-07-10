@@ -6,8 +6,11 @@ import { createRequire } from 'node:module';
 const require_ = createRequire(import.meta.url);
 
 export function hasTypeScript(): boolean {
-  // Quick syntactic check: any .ts file in capabilities/ → true
-  // (we still verify tsx is loadable below).
+  // We always say "yes, the project might use TypeScript abilities" here
+  // and let `tsxLoaderAvailable()` do the real check by trying to resolve
+  // `tsx/esm`. This way the loader can give a clear "tsx not installed"
+  // hint when a .ts ability exists but the dep is missing, rather than
+  // silently skipping TS support based on a syntactic guess.
   return true;
 }
 

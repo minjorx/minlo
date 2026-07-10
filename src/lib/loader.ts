@@ -1,10 +1,11 @@
-// Capability loader.
+// Ability loader.
 //
 // Scans one or more directories for `.js` / `.ts` files, dynamically imports
-// each one, and validates the exports against the strict 5-field schema
-// (name / description / init / execute / destroy — see CLAUDE.md §3.1).
+// each one, and validates the exports against the strict 7-field schema
+// (name / description / init / execute / destroy / deps / externalDeps — see
+// docs/design.md §3.1).
 //
-// Validation rules (per CLAUDE.md §5.3):
+// Validation rules (per docs/design.md §5.3):
 //   - `name` and `description` are required and must be strings
 //   - At least one of `init` / `execute` / `destroy` must be a function
 //   - Any other export key (e.g. `type`, `order`, `config`, `chat`) → reject

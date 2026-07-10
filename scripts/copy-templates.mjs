@@ -1,8 +1,12 @@
 #!/usr/bin/env node
-// Copy bundled templates (default.json agent template) from src/ to dist/ so
-// the published package contains them next to the compiled JS. The runtime
-// resolver in src/commands/init.ts looks for the template relative to its
-// own location, so the dist layout must mirror the src layout.
+// Copy bundled templates from templates/ to dist/templates/ so the published
+// package contains them next to the compiled JS. The runtime resolver in
+// src/commands/init.ts looks for templates relative to its own location, so
+// the dist layout must mirror the src layout.
+//
+// Currently templates/missions/default.json is the only file (used by
+// `minlo init`). The walker is recursive so adding more subdirectories
+// (e.g. templates/abilities/) is a no-op for this script.
 import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
