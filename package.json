@@ -15,7 +15,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/copy-templates.mjs",
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
     "start": "node dist/bin/minlo.js",
     "dev": "tsx bin/minlo.ts",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",

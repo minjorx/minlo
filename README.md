@@ -185,6 +185,7 @@ minlo run
 | `minlo init [--here]` | 初始化工作区(创建 `.minlo/` 3 个目录 + default mission) |
 | `minlo run [name[:fb]]` | 启动主循环。无参 = `default`;`<name>` 严格匹配;`<name:fb>` 失败 fallback |
 | `minlo list` | 列出已注册的能力(local / global) |
+| `minlo docs` | 把 [docs/design.md](docs/design.md) 全文打印到 stdout — 给 LLM agent / 外部工具读 minlo 规范用 |
 | `minlo mission list` | 列出所有任务文件 |
 | `minlo mission show <name>` | 打印任务的完整 JSON |
 | `minlo mission validate <name>` | 校验任务 JSON 格式及引用的能力是否存在 |

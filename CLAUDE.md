@@ -25,6 +25,7 @@
 | 自己写能力时 `execute` 该返回什么 | [docs/design.md §4.2](docs/design.md#42-阶段二主循环v1-死循环无-maxiterations) |
 | global 能力依赖为什么解析不到 | [docs/design.md §3.10](docs/design.md#310-外部依赖externaldeps) |
 | 能力间怎么互相调用(provide / call) | [docs/design.md §3.12](docs/design.md#312-跨能力-api-调用provide-字段--processminlocall) |
+| 让 LLM agent 读 minlo 规范 | 跑 `minlo docs`(把 [docs/design.md](docs/design.md) 吐到 stdout) |
 
 ## 命令速查
 

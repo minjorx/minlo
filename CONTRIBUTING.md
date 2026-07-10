@@ -38,7 +38,7 @@
 │   ├── demo-user.js            # provide 字段示范: process.minlo.call('counter.increment')
 │   └── llm.js                  # OpenAI 兼容 LLM 能力
 ├── scripts/
-│   ├── copy-templates.mjs      # tsc 后把 templates/ 复制到 dist/templates/
+│   ├── copy-assets.mjs         # tsc 后把 templates/ 和 docs/ 复制到 dist/
 │   └── install-global-helloworld.js   # postinstall 钩子
 ├── docs/
 │   ├── design.md               # 完整设计文档
@@ -85,7 +85,7 @@ npm run install:global         # 手动跑 postinstall(把 global-assets/abiliti
 npm version patch   # 或 minor / major
 
 # 2. 构建
-npm run build       # tsc + copy-templates
+npm run build       # tsc + copy-assets (templates/, docs/)
 
 # 3. 验证
 node dist/bin/minlo.js --version
@@ -110,7 +110,7 @@ npm publish         # postinstall 钩子会自动跑
 | 主循环 | `src/commands/run.ts` + `docs/design.md §4` |
 | `process.minlo.call` / `provide` 字段 | `src/commands/run.ts` (call 安装 + provides 镜像) + `src/lib/loader.ts` (字段校验) + `docs/design.md §3.12` |
 | 全局能力 | `global-assets/abilities/` + `scripts/install-global-helloworld.js` |
-| 用户模板 | `templates/missions/default.json` + `scripts/copy-templates.mjs` |
+| 用户模板 / 文档 | `templates/missions/default.json` + `docs/design.md` → `scripts/copy-assets.mjs` |
 
 ## 测试
 

@@ -7,6 +7,7 @@ import { registerVersion } from './commands/version.js';
 import { registerInit } from './commands/init.js';
 import { registerRun } from './commands/run.js';
 import { registerList } from './commands/list.js';
+import { registerDocs } from './commands/docs.js';
 
 export interface PackageMetadata {
   name: string;
@@ -25,6 +26,7 @@ export async function run(pkg: PackageMetadata, argv: string[]): Promise<void> {
   registerInit(program);
   registerList(program);
   registerRun(program);
+  registerDocs(program);
 
   await program.parseAsync(argv);
 }
