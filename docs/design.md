@@ -44,8 +44,7 @@
 7. [配置优先级](#7-配置优先级)
 8. [TypeScript 支持策略](#8-typescript-支持策略)
 9. [设计约束与边界](#9-设计约束与边界)
-10. [快速开始](#10-快速开始)
-11. [端到端工作流示例](#11-端到端工作流示例) — 见 [docs/examples/](./examples/)
+10. [端到端工作流示例](#10-端到端工作流示例) — 见 [docs/examples/](./examples/)
 
 ---
 
@@ -936,68 +935,9 @@ Minlo **不**对 `abilities/` `missions/` 做 `fs.watch`：
 
 ---
 
-## 10. 快速开始
+## 10. 端到端工作流示例
 
-### 10.1 全局安装
-
-```bash
-npm install -g minlo
-```
-
-`npm install -g minlo` 的副作用：
-- 把 `minlo` 包装到全局 `node_modules/`，暴露 `minlo` 命令
-- **`postinstall` 钩子自动执行**（详见 §10.2）——把包内 `global-assets/abilities/helloworld.js` 复制到 `~/.minlo/abilities/`
-
-### 10.2 `postinstall` 行为
-
-minlo 包附带一份"开箱即用"的能力文件 `helloworld.js`，作为全局默认能力示例。`npm install -g minlo` 触发 `postinstall` 钩子执行 `scripts/install-global-helloworld.js`：
-
-```bash
-# postinstall 干的事：
-node scripts/install-global-helloworld.js
-#   from: <minlo>/global-assets/abilities/helloworld.js
-#   to:   ~/.minlo/abilities/helloworld.js
-```
-
-**幂等性**：如果 `~/.minlo/abilities/helloworld.js` 已经存在（用户改过、之前装过等），`postinstall` **不会覆盖**。要强制重装：
-
-```bash
-rm ~/.minlo/abilities/helloworld.js
-npm install -g minlo   # 重装即重新触发 postinstall
-```
-
-如果想跳过 `postinstall`：
-
-```bash
-npm install -g minlo --ignore-scripts
-```
-
-### 10.3 创建第一个项目
-
-```bash
-# 创建项目目录
-mkdir my-mission && cd my-mission
-
-# 初始化工作区
-minlo init
-
-# 查看可用能力（应能看到 helloworld）
-minlo list
-
-# 启动运行（default 任务 包含 helloworld）
-minlo run
-#   [helloworld] init  (executeCount reset to 0)
-#     ✓ init helloworld
-#   [helloworld] execute #1 (step=0)
-#   ...
-#   [helloworld] execute #11 (step=10)
-#   [helloworld] returning { action: "stop" } (executed > 10 times)
-#   [helloworld] destroy (total executes: 11)
-```
-
----
-
-## 11. 端到端工作流示例
+> **状态性内容(安装步骤、postinstall 行为、第一个项目)已搬到 [docs/STATUS.md §现在能做什么](./STATUS.md#现在能做什么-)。** 本节只保留端到端 walkthrough 入口。
 
 完整示例见 [`docs/examples/`](./examples/)：
 - [`weather.md`](./examples/weather.md) — 开发天气查询能力并调试

@@ -328,6 +328,9 @@ minlo run
 
 直接在仓库开 issue。框架的「已知 UX 权衡」在 [docs/design.md §9](docs/design.md#9-设计约束与边界) 有说明。LLM agent 想读完整规范见 [docs/design.md](docs/design.md)(或跑 `minlo docs`)。
 
+- **设计是什么** → [docs/design.md](docs/design.md)(v1.0 定稿,几乎不变)
+- **现在能做什么 / 不能做什么** → [docs/STATUS.md](docs/STATUS.md)(随版本变)
+
 ## License
 
 未声明(待定)。
