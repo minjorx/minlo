@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// install-global-helloworld.js — copy every bundled capability from
+// install-global-helloworld.js — copy every bundled ability from
 // <minlo>/global-assets/abilities/ into ~/.minlo/abilities/.
 //
 // Used by the `postinstall` npm hook so that `npm install -g minlo` places
@@ -35,7 +35,7 @@ if (!statSync(SRC_DIR).isDirectory()) die(`source is not a directory: ${SRC_DIR}
 mkdirSync(DEST_DIR, { recursive: true });
 
 // Ensure ~/.minlo/package.json exists with type:module so Node parses the
-// global capabilities as ESM (without it, Node tries CommonJS first and
+// global abilities as ESM (without it, Node tries CommonJS first and
 // emits a MODULE_TYPELESS_PACKAGE_JSON warning per file).
 const HOME = homedir();
 const pkgJsonPath = join(HOME, '.minlo', 'package.json');
@@ -45,7 +45,7 @@ if (!existsSync(pkgJsonPath)) {
     version: '0.1.0',
     private: true,
     type: 'module',
-    description: 'Global minlo capabilities and config — see CLAUDE.md §3.6 / §11',
+    description: 'Global minlo abilities and config — see CLAUDE.md §3.6 / §11',
   };
   writeFileSync(pkgJsonPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
   console.log(`install-global: wrote ${pkgJsonPath}`);
@@ -72,5 +72,5 @@ for (const entry of readdirSync(SRC_DIR)) {
 
 console.log('');
 console.log(`install-global: done (${copied} copied, ${skipped} skipped)`);
-console.log('These capabilities are now available globally to all minlo projects.');
-console.log('Reference them by name in any agent\'s abilities array.');
+console.log('These abilities are now available globally to all minlo projects.');
+console.log('Reference them by name in any mission\'s abilities array.');

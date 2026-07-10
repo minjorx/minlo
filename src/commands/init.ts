@@ -75,7 +75,7 @@ function ensurePackageJson(cwd: string): PkgMergeResult {
       // No dependencies here: the minlo CLI is installed globally
       // (`npm install -g minlo`), not per-project. Per-project deps
       // should be added when the user installs npm packages for
-      // capabilities (see CLAUDE.md §3.10).
+      // abilities (see CLAUDE.md §3.10).
     };
     writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
     return {
@@ -99,7 +99,7 @@ function ensurePackageJson(cwd: string): PkgMergeResult {
 
   // No per-project dependency on minlo: the CLI is installed globally,
   // not per-project. (Per-project deps are added by the user when they
-  // install npm packages for capabilities — see CLAUDE.md §3.10.)
+  // install npm packages for abilities — see CLAUDE.md §3.10.)
 
   // scripts: only add the keys that don't exist (never overwrite user scripts)
   const scripts = (parsed.scripts as Record<string, string> | undefined) ?? {};

@@ -17,7 +17,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { hasTypeScript, tsxLoaderAvailable } from './runtime.js';
 
-export interface CapabilityRecord {
+export interface AbilityRecord {
   name: string;
   description: string;
   hasInit: boolean;
@@ -41,7 +41,7 @@ export interface LoadOptions {
   source: 'local' | 'global';
 }
 
-export async function loadCapabilitiesFrom(opts: LoadOptions): Promise<CapabilityRecord[]> {
+export async function loadAbilitiesFrom(opts: LoadOptions): Promise<AbilityRecord[]> {
   const { dir, source } = opts;
   if (!existsSync(dir)) return [];
 
@@ -58,7 +58,7 @@ export async function loadCapabilitiesFrom(opts: LoadOptions): Promise<Capabilit
   const useTsx = hasTypeScript();
   const tsxOk = await tsxLoaderAvailable();
 
-  const out: CapabilityRecord[] = [];
+  const out: AbilityRecord[] = [];
   for (const filePath of files) {
     if (filePath.endsWith('.ts') && !(useTsx && tsxOk)) {
       console.error(`minlo: skip ${relativeIn(dir, filePath)} — .ts file but tsx is not available`);
@@ -81,7 +81,7 @@ export async function loadCapabilitiesFrom(opts: LoadOptions): Promise<Capabilit
     }
 
     const instance = (mod.default && typeof mod.default === 'object' ? mod.default : mod) as Record<string, unknown>;
-    const record = validateCapability(instance, filePath, source);
+    const record = validateAbility(instance, filePath, source);
     if (record) out.push(record);
   }
 
@@ -126,11 +126,11 @@ function describeImportFailure(
   return `minlo: cannot import ${rel}: ${raw}`;
 }
 
-function validateCapability(
+function validateAbility(
   instance: Record<string, unknown>,
   filePath: string,
   source: 'local' | 'global',
-): CapabilityRecord | null {
+): AbilityRecord | null {
   // 1. Field whitelist
   for (const k of Object.keys(instance)) {
     if (!ALLOWED_KEYS.has(k)) {
@@ -239,11 +239,11 @@ function validateCapability(
  * Build the merged registry from local + global directories.
  * Local takes precedence on name collision (per CLAUDE.md §3.6 / §5.1).
  */
-export async function buildRegistry(localDir: string, globalDir: string): Promise<CapabilityRecord[]> {
-  const locals = await loadCapabilitiesFrom({ dir: localDir, source: 'local' });
-  const globals = await loadCapabilitiesFrom({ dir: globalDir, source: 'global' });
+export async function buildRegistry(localDir: string, globalDir: string): Promise<AbilityRecord[]> {
+  const locals = await loadAbilitiesFrom({ dir: localDir, source: 'local' });
+  const globals = await loadAbilitiesFrom({ dir: globalDir, source: 'global' });
 
-  const byName = new Map<string, CapabilityRecord>();
+  const byName = new Map<string, AbilityRecord>();
   const conflicts: string[] = [];
 
   // Globals first (lower priority)
@@ -262,7 +262,7 @@ export async function buildRegistry(localDir: string, globalDir: string): Promis
   }
 
   for (const name of conflicts) {
-    console.error(`minlo: capability "${name}" — local version overrides global`);
+    console.error(`minlo: ability "${name}" — local version overrides global`);
   }
 
   return [...byName.values()];
@@ -271,10 +271,10 @@ export async function buildRegistry(localDir: string, globalDir: string): Promis
 /**
  * Cheap pre-scan: read each .js/.ts file in `dir` and extract the
  * `externalDeps = [...]` array literal via a small regex. Used to check
- * npm dependencies BEFORE actually importing capability files (which would
+ * npm dependencies BEFORE actually importing ability files (which would
  * fail with a noisy stack trace if a dep is missing).
  *
- * Returns a Map<capabilityName, { pkgs, source }>. Files that fail to read
+ * Returns a Map<abilityName, { pkgs, source }>. Files that fail to read
  * or don't declare externalDeps are simply absent from the result.
  */
 export async function scanExternalDeps(
@@ -304,10 +304,10 @@ export async function scanExternalDeps(
       }
       if (pkgs.length === 0) continue;
       // Try to also pull a `name = '...'` from the same file so we can key
-      // by capability name. Falls back to filename.
+      // by ability name. Falls back to filename.
       const nameMatch = /export\s+const\s+name\s*=\s*['"]([^'"]+)['"]/.exec(text);
-      const capName = nameMatch ? nameMatch[1] : entry.replace(/\.(js|ts)$/, '');
-      result.set(capName, { pkgs, source });
+      const abilityName = nameMatch ? nameMatch[1] : entry.replace(/\.(js|ts)$/, '');
+      result.set(abilityName, { pkgs, source });
     } catch {
       // unreadable files: skip silently, full validation will catch them later
     }

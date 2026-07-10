@@ -402,7 +402,7 @@ export async function init() {
   // 框架在阶段 1 步骤 4 已经把 config 放进 process.minlo.configs.openai
   const config = process.minlo.configs.openai;
   if (!config) {
-    throw new Error('openai capability requires config (model, apiKeyEnv)');
+    throw new Error('openai ability requires config (model, apiKeyEnv)');
   }
   // 用 config.model / config.temperature / config.apiKeyEnv
   // ... 创建 client ...

@@ -1,6 +1,6 @@
-// Topological sort over capability deps.
+// Topological sort over ability deps.
 //
-// Given a list of CapabilityRecord (each with a `deps: string[]` field),
+// Given a list of AbilityRecord (each with a `deps: string[]` field),
 // produce a linear order such that for any edge A → B in `A.deps`, B comes
 // before A in the order. Use Kahn's algorithm (BFS on in-degree).
 //
@@ -8,11 +8,11 @@
 //   - Any dep references an unknown name → DependencyNotFoundError
 //   - Any cycle exists (A.deps contains B and B.deps contains A, etc.) →
 //     CyclicDependencyError
-import type { CapabilityRecord } from './loader.js';
+import type { AbilityRecord } from './loader.js';
 
 export class DependencyNotFoundError extends Error {
   constructor(public readonly dep: string, public readonly from: string) {
-    super(`capability "${from}" depends on unknown capability "${dep}"`);
+    super(`ability "${from}" depends on unknown ability "${dep}"`);
     this.name = 'DependencyNotFoundError';
   }
 }
@@ -24,10 +24,10 @@ export class CyclicDependencyError extends Error {
   }
 }
 
-export function topoSort(records: CapabilityRecord[]): CapabilityRecord[] {
+export function topoSort(records: AbilityRecord[]): AbilityRecord[] {
   const byName = new Map(records.map((r) => [r.name, r]));
 
-  // Validate all deps reference known capabilities
+  // Validate all deps reference known abilities
   for (const r of records) {
     for (const dep of r.deps) {
       if (!byName.has(dep)) {
@@ -56,7 +56,7 @@ export function topoSort(records: CapabilityRecord[]): CapabilityRecord[] {
     if (deg === 0) queue.push(name);
   }
 
-  const order: CapabilityRecord[] = [];
+  const order: AbilityRecord[] = [];
   while (queue.length > 0) {
     // Stable order: sort to make output deterministic
     queue.sort();

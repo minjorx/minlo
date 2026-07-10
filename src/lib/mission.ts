@@ -1,22 +1,22 @@
 // Mission loader.
 //
 // Resolves a mission name (per CLAUDE.md §6.1.2) to an absolute path, reads
-// the JSON, and validates that every name in `capabilities` exists in the
-// capability registry.
+// the JSON, and validates that every name in `abilities` exists in the
+// ability registry.
 //
-// `capabilities` schema (v1): each item is either:
+// `abilities` schema (v1): each item is either:
 //   - a string  (e.g. "openai")   — equivalent to { name: "openai" }
 //   - an object (e.g. { name: "openai", config: { ... } })
 //
 // The `config` object is stored as-is on the MissionSpec. The run command
-// later exposes it to the capability at process.minlo.configs[name].
+// later exposes it to the ability at process.minlo.configs[name].
 //
 // Terminology note: we use "mission" (not "agent") because minlo is not
 // tied to LLM. A mission can be an LLM REPL, a MUD room update, a periodic
-// timer — anything that combines capabilities into a runnable unit.
+// timer — anything that combines abilities into a runnable unit.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { CapabilityRecord } from './loader.js';
+import type { AbilityRecord } from './loader.js';
 
 export interface AbilityRef {
   name: string;
@@ -26,7 +26,7 @@ export interface AbilityRef {
 export interface MissionSpec {
   name: string;
   description?: string;
-  capabilities: AbilityRef[];
+  abilities: AbilityRef[];
   raw: Record<string, unknown>;
   filePath: string;
 }
@@ -52,13 +52,13 @@ export function parseMissionArg(arg: string | undefined): MissionResolution {
 
 /**
  * Resolve a MissionResolution to an absolute path + validated MissionSpec.
- * Throws if not found; throws if JSON is invalid; throws if capabilities
+ * Throws if not found; throws if JSON is invalid; throws if abilities
  * reference names not in the registry.
  */
 export function resolveMission(
   resolution: MissionResolution,
   missionsDir: string,
-  registry: CapabilityRecord[],
+  registry: AbilityRecord[],
 ): MissionSpec {
   const candidates: string[] =
     resolution.kind === 'strict'
@@ -86,7 +86,7 @@ export class MissionNotFoundError extends Error {
 
 function loadMission(
   filePath: string,
-  registry: CapabilityRecord[],
+  registry: AbilityRecord[],
   expectedName: string,
 ): MissionSpec {
   let raw: Record<string, unknown>;
@@ -105,12 +105,12 @@ function loadMission(
   const description = typeof raw.description === 'string' ? raw.description : undefined;
 
   // abilities — v1: each item is string OR { name, config? }
-  // (We store internally as `capabilities` but the on-disk JSON field is
-  //  `abilities` — see CLAUDE.md §3.3)
+  // (Stored internally as `abilities` matching the on-disk JSON field —
+  //  see CLAUDE.md §3.3)
   if (!Array.isArray(raw.abilities)) {
     throw new Error(`mission "${expectedName}" — "abilities" must be an array`);
   }
-  const capabilities: AbilityRef[] = [];
+  const abilities: AbilityRef[] = [];
   const seen = new Set<string>();
   for (let i = 0; i < raw.abilities.length; i++) {
     const item = raw.abilities[i];
@@ -151,11 +151,11 @@ function loadMission(
 
     if (seen.has(ref.name)) {
       throw new Error(
-        `mission "${expectedName}" — capability "${ref.name}" appears more than capabilities`,
+        `mission "${expectedName}" — ability "${ref.name}" appears more than once in "abilities"`,
       );
     }
     seen.add(ref.name);
-    capabilities.push(ref);
+    abilities.push(ref);
   }
 
   // Reject v1-removed fields explicitly
@@ -170,7 +170,7 @@ function loadMission(
 
   // Validate abilities reference real abilities
   const registered = new Set(registry.map((c) => c.name));
-  for (const a of capabilities) {
+  for (const a of abilities) {
     if (!registered.has(a.name)) {
       throw new Error(
         `mission "${expectedName}" references unknown ability "${a.name}" ` +
@@ -179,5 +179,5 @@ function loadMission(
     }
   }
 
-  return { name: raw.name, description, capabilities, raw, filePath };
+  return { name: raw.name, description, abilities, raw, filePath };
 }

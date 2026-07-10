@@ -13,7 +13,7 @@ import type { Command } from 'commander';
 import {
   buildRegistry,
   scanExternalDeps,
-  type CapabilityRecord,
+  type AbilityRecord,
 } from '../lib/loader.js';
 import {
   topoSort,
@@ -33,7 +33,7 @@ interface RunOptions {
 
 interface MinloNamespace {
   ctx: Record<string, unknown>;
-  // configs[name] = mission.capabilities[].config for that ability
+  // configs[name] = mission.abilities[].config for that ability
   configs: Record<string, Record<string, unknown>>;
   // provides[name] = { fn1, fn2, ... } — written in phase 2 by reading
   // each in-scope ability's `provide` field (see docs/design.md §3.12).
@@ -192,11 +192,11 @@ export async function runMain(opts: RunOptions): Promise<number> {
   }
 
   // === 阶段 1: 加载 + 解析 ===
-  console.log('minlo: loading capabilities...');
+  console.log('minlo: loading abilities...');
   const registry = await buildRegistry(localAbilitiesDir, globalAbilitiesDir);
   if (registry.length === 0) {
     console.error(
-      `minlo: no capabilities found in ${localAbilitiesDir}\n` +
+      `minlo: no abilities found in ${localAbilitiesDir}\n` +
         `       Add at least one .js file under .minlo/abilities/ to proceed.`,
     );
     return 1;
@@ -217,13 +217,13 @@ export async function runMain(opts: RunOptions): Promise<number> {
     }
     return 1;
   }
-  const abilityNames = mission.capabilities.map((a) => a.name);
+  const abilityNames = mission.abilities.map((a) => a.name);
   console.log(
     `minlo: mission "${mission.name}" loaded (abilities: ${abilityNames.join(', ') || '<none>'})`,
   );
 
-  // Resolve the set of capabilities actually in play: start from
-  // mission.capabilities, then transitively pull in every dep. This way
+  // Resolve the set of abilities actually in play: start from
+  // mission.abilities, then transitively pull in every dep. This way
   // `topoSort` can detect (a) deps that reference names not in the
   // registry at all, and (b) cycles among the full reachable set.
   const byName = new Map(registry.map((c) => [c.name, c]));
@@ -235,7 +235,7 @@ export async function runMain(opts: RunOptions): Promise<number> {
     const cap = byName.get(name);
     if (!cap) {
       console.error(
-        `minlo: mission "${mission.name}" references unknown capability "${name}" ` +
+        `minlo: mission "${mission.name}" references unknown ability "${name}" ` +
           `(check .minlo/abilities/ or remove the reference)`,
       );
       return 1;
@@ -245,7 +245,7 @@ export async function runMain(opts: RunOptions): Promise<number> {
   }
   const inScopeRecords = [...inScope].map((n) => byName.get(n)!);
 
-  let orderedCaps: CapabilityRecord[];
+  let orderedCaps: AbilityRecord[];
   try {
     orderedCaps = topoSort(inScopeRecords);
   } catch (err) {
@@ -270,7 +270,7 @@ export async function runMain(opts: RunOptions): Promise<number> {
   // each `minlo run` is a fresh node process — but it's a cheap
   // idempotent assignment).
   (process as NodeJS.Process & { minlo: MinloNamespace & { call: typeof minloCall } }).minlo.call = minloCall;
-  for (const ref of mission.capabilities) {
+  for (const ref of mission.abilities) {
     if (ref.config !== undefined) {
       ns.configs[ref.name] = ref.config;
     }

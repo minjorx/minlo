@@ -1,4 +1,4 @@
-// llm.js — OpenAI-compatible chat completion capability (uses the
+// llm.js — OpenAI-compatible chat completion ability (uses the
 // `openai` npm SDK for the HTTP layer; we don't reimplement auth/streaming
 // on top of fetch).
 //
@@ -10,7 +10,7 @@
 //   5. Print the assistant reply
 //   6. Append assistant reply to messages
 //   7. return { action: 'continue' } — loop only stops via Ctrl-C or another
-//      capability returning 'stop'
+//      ability returning 'stop'
 //
 // State is kept in process.minlo.ctx.llm (key = ability name per
 // CLAUDE.md §3.8).

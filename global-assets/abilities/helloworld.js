@@ -1,4 +1,4 @@
-// Hello world capability — bundled with minlo, intended to be installed
+// Hello world ability — bundled with minlo, intended to be installed
 // into ~/.minlo/abilities/ as a global default. Demonstrates the full
 // schema (name / description required; init / execute / destroy all
 // present here as a complete example). Counts the number of execute calls
