@@ -278,9 +278,40 @@ export async function runMain(opts: RunOptions): Promise<number> {
 
   const initCtx = { cwd, mission: mission.raw, workspacePath };
 
-  // === 阶段 2: 拓扑序 init ===
-  // v1 行为：init 失败 → stderr 报错 → 直接退出（不再进主循环）。
-  // 原因：init 失败的 config / 资源问题让主循环毫无意义，
+  // === 阶段 2 (3-pass): 提供 → 初始化 → 主循环 ===
+  //
+  // 把"能力处理"分成 3 个独立 pass,而不是混在一个循环里:
+  //
+  //   Pass 1 (provide): 循环所有能力,把它们 export 的 `provide` 对象
+  //     挂到 process.minlo.provides。这一步**不**调任何 init,只是登记。
+  //     顺序无关(不依赖 deps),所有 ability 的 provide 同步可见。
+  //
+  //   Pass 2 (init):   按拓扑序循环所有能力,对每个有 init 的能力调一次。
+  //     此时 process.minlo.provides 已是完整的,任何 ability 的 init
+  //     都能调任何其他 ability 的 provide —— 不需要"边 init 边镜像"
+  //     这种复杂的时序耦合。
+  //
+  //   Pass 3 (execute): 主循环。按 abilities 数组顺序对每轮每个有
+  //     execute 的能力调一次,根据返回值协议(continue/break/stop)
+  //     决定是否继续。
+  //
+  // 设计动机: prompt 这个 ability 想在 init 里调 process.minlo.call(
+  // 'llm.setInstructions', ...) 注入系统提示词 —— 它依赖 llm.init 先
+  // 跑完。 之前"边 init 边镜像 provides"能 work,但把状态改动和 init
+  // 副作用混在一起,逻辑不清晰。Pass 1 先统一注册所有 provide,
+  // Pass 2 再按拓扑序 init,两个职责干净分离。详见 docs/design.md §3.12。
+
+  // Pass 1: 注册所有 provide(顺序无关)
+  for (const cap of orderedCaps) {
+    const api = (cap.instance as { provide?: Record<string, (...args: unknown[]) => unknown> }).provide;
+    if (api && typeof api === 'object') {
+      ns.provides[cap.name] = api;
+    }
+  }
+
+  // Pass 2: 拓扑序 init
+  // v1 行为:init 失败 → stderr 报错 → 直接退出(不再进主循环)。
+  // 原因:init 失败的 config / 资源问题让主循环毫无意义,
   // 而 execute 二次抛"state not initialized"会污染错误信息。
   console.log('minlo: init phase...');
   for (const cap of orderedCaps) {
@@ -293,16 +324,6 @@ export async function runMain(opts: RunOptions): Promise<number> {
         `minlo: init "${cap.name}" threw: ${(err as Error).message}`,
       );
       return 1;
-    }
-  }
-
-  // Phase 2 step 4.5: seed process.minlo.provides from each in-scope
-  // ability's `provide` field. Other abilities can now reach these
-  // functions via `process.minlo.call('<name>.<fn>', ...args)`.
-  for (const cap of orderedCaps) {
-    const api = (cap.instance as { provide?: Record<string, (...args: unknown[]) => unknown> }).provide;
-    if (api && typeof api === 'object') {
-      ns.provides[cap.name] = api;
     }
   }
 
